@@ -10,6 +10,7 @@ import { promisify }   from "util";
 import path            from "path";
 import fs              from "fs";
 import os              from "os";
+import { fileURLToPath } from "url";
 
 import {
   YTDLP_BIN,
@@ -23,16 +24,20 @@ import {
 
 const execAsync = promisify(exec);
 
+// ── Node.js binary directory (for yt-dlp JS runtime) ─────────────────────────
+const NODE_DIR = path.dirname(process.execPath);
+
+// ── Build PATH that includes Node.js so yt-dlp can find it ───────────────────
+const ENRICHED_PATH = `${process.env.PATH || ""}:${NODE_DIR}`;
+
 // ── Load cookies ──────────────────────────────────────────────────────────────
 let COOKIES_FILE = null;
 
 if (process.env.NODE_ENV === "production" && process.env.YOUTUBE_COOKIES) {
-  // Production (Render) — write env variable content to a temp file
   COOKIES_FILE = path.join(os.tmpdir(), "yt_cookies.txt");
   fs.writeFileSync(COOKIES_FILE, process.env.YOUTUBE_COOKIES, "utf-8");
   console.log("✅ YouTube cookies loaded from environment variable");
 } else {
-  // Local development — use cookies.txt file directly
   const localCookies = path.join(process.cwd(), "cookies.txt");
   if (fs.existsSync(localCookies)) {
     COOKIES_FILE = localCookies;
@@ -44,24 +49,14 @@ if (process.env.NODE_ENV === "production" && process.env.YOUTUBE_COOKIES) {
 
 // ── Utility helpers ───────────────────────────────────────────────────────────
 
-/**
- * Returns the yt-dlp format string for a given quality label.
- * Falls back to "best" for unrecognised values.
- */
 export function getFormat(quality) {
   return FORMAT_MAP[quality] ?? FORMAT_MAP["best"];
 }
 
-/**
- * Returns the MIME type for a given file extension.
- */
 export function getMimeType(ext) {
   return MIME_MAP[ext] ?? "application/octet-stream";
 }
 
-/**
- * Strips characters that are illegal in filenames.
- */
 export function safeFilename(title = "video") {
   return title.replace(/[/\\?%*:|"<>]/g, "-");
 }
@@ -72,16 +67,15 @@ export function safeFilename(title = "video") {
  * Fetches video metadata from YouTube via yt-dlp --dump-json.
  */
 export async function fetchVideoInfo(url) {
-  const cookieArg   = COOKIES_FILE ? `--cookies "${COOKIES_FILE}"` : "";
-  const nodePath    = process.execPath; // path to current Node.js binary
+  const cookieArg = COOKIES_FILE ? `--cookies "${COOKIES_FILE}"` : "";
 
   const { stdout } = await execAsync(
     `${YTDLP_BIN} --dump-json --no-playlist ${cookieArg} --extractor-args "youtube:player_client=web" "${url}"`,
     {
       env: {
         ...process.env,
-        PATH: `${process.env.PATH}:${require("path").dirname(nodePath)}`,
-      }
+        PATH: ENRICHED_PATH,
+      },
     }
   );
 
@@ -95,6 +89,7 @@ export async function fetchVideoInfo(url) {
     id:         raw.id,
   };
 }
+
 /**
  * Downloads a YouTube video to the system temp directory.
  */
@@ -123,7 +118,7 @@ export async function downloadVideo(url, quality = "best") {
     "--retries",              RETRIES,
     "--fragment-retries",     RETRIES,
     "--merge-output-format",  ext,
-      "--extractor-args",       "youtube:player_client=web",
+    "--extractor-args",       "youtube:player_client=web",
     ...(COOKIES_FILE ? ["--cookies", COOKIES_FILE] : []),
     ...(isAudio ? ["--extract-audio", "--audio-format", "m4a"] : []),
     url,
@@ -144,14 +139,16 @@ export async function downloadVideo(url, quality = "best") {
 
 // ── Private helpers ───────────────────────────────────────────────────────────
 
+/**
+ * Spawns a child process with enriched PATH so yt-dlp can find Node.js.
+ */
 function runProcess(bin, args) {
   return new Promise((resolve, reject) => {
-    const nodePath = process.execPath;
     const proc = spawn(bin, args, {
       env: {
         ...process.env,
-        PATH: `${process.env.PATH}:${path.dirname(nodePath)}`,
-      }
+        PATH: ENRICHED_PATH,
+      },
     });
 
     proc.stderr.on("data", (chunk) => process.stderr.write(`[yt-dlp] ${chunk}`));
