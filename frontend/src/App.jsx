@@ -8,7 +8,7 @@ import ErrorBox from "./components/errorBox/ErrorBox";
 import "./app.css";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-const API = "http://localhost:4000";
+const API = import.meta.env.VITE_API_URL;
 
 export const QUALITIES = [
   { id: "best", label: "Best", tag: "AUTO" },

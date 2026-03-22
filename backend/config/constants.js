@@ -5,8 +5,7 @@
  */
 
 // ── Server ────────────────────────────────────────────────────────────────────
-export const PORT = 4000;
-
+export const PORT = process.env.PORT || 4000;
 // ── yt-dlp ────────────────────────────────────────────────────────────────────
 export const YTDLP_BIN = "yt-dlp";
 export const CONCURRENT_FRAGMENTS = "5"; // parallel chunk downloads

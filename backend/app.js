@@ -11,7 +11,24 @@ import { notFound, errorHandler } from "./middleware/errorHandler.js";
 const app = express();
 
 // ── Middleware ────────────────────────────────────────────────────────────────
-app.use(cors());
+const allowedOrigins = [
+  "http://localhost:5173", // local dev
+  "https://your-frontend-on-vercel.app", // production
+];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+        
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS blocked: ${origin}`));
+      }
+    },
+  }),
+);
+
 app.use(express.json());
 
 // ── Routes ────────────────────────────────────────────────────────────────────
