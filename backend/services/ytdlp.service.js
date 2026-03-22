@@ -2,7 +2,6 @@
  * services/ytdlp.service.js — YouTube download service
  * Uses YT-API (RapidAPI) instead of local yt-dlp.
  */
-import fetch  from "node-fetch";
 import path   from "path";
 import fs     from "fs";
 import os     from "os";
