@@ -11,3 +11,5 @@ services:
         value: production
       - key: PORT
         value: 4000
+      - key: YOUTUBE_COOKIES
+        sync: false

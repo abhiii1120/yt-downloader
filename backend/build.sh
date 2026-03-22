@@ -6,7 +6,7 @@ npm install
 # Install yt-dlp via pip
 pip install -U yt-dlp
 
-# Download ffmpeg static binary (no root needed)
+# Download ffmpeg static binary
 mkdir -p ./bin
 curl -L https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz \
   -o ffmpeg.tar.xz

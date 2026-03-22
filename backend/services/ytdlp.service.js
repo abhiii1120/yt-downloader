@@ -72,10 +72,17 @@ export function safeFilename(title = "video") {
  * Fetches video metadata from YouTube via yt-dlp --dump-json.
  */
 export async function fetchVideoInfo(url) {
-  const cookieArg = COOKIES_FILE ? `--cookies "${COOKIES_FILE}"` : "";
+  const cookieArg   = COOKIES_FILE ? `--cookies "${COOKIES_FILE}"` : "";
+  const nodePath    = process.execPath; // path to current Node.js binary
 
   const { stdout } = await execAsync(
-    `${YTDLP_BIN} --dump-json --no-playlist ${cookieArg} "${url}"`
+    `${YTDLP_BIN} --dump-json --no-playlist ${cookieArg} --extractor-args "youtube:player_client=web" "${url}"`,
+    {
+      env: {
+        ...process.env,
+        PATH: `${process.env.PATH}:${require("path").dirname(nodePath)}`,
+      }
+    }
   );
 
   const raw = JSON.parse(stdout);
@@ -88,7 +95,6 @@ export async function fetchVideoInfo(url) {
     id:         raw.id,
   };
 }
-
 /**
  * Downloads a YouTube video to the system temp directory.
  */
@@ -117,6 +123,7 @@ export async function downloadVideo(url, quality = "best") {
     "--retries",              RETRIES,
     "--fragment-retries",     RETRIES,
     "--merge-output-format",  ext,
+      "--extractor-args",       "youtube:player_client=web",
     ...(COOKIES_FILE ? ["--cookies", COOKIES_FILE] : []),
     ...(isAudio ? ["--extract-audio", "--audio-format", "m4a"] : []),
     url,
@@ -139,7 +146,14 @@ export async function downloadVideo(url, quality = "best") {
 
 function runProcess(bin, args) {
   return new Promise((resolve, reject) => {
-    const proc = spawn(bin, args);
+    const nodePath = process.execPath;
+    const proc = spawn(bin, args, {
+      env: {
+        ...process.env,
+        PATH: `${process.env.PATH}:${path.dirname(nodePath)}`,
+      }
+    });
+
     proc.stderr.on("data", (chunk) => process.stderr.write(`[yt-dlp] ${chunk}`));
     proc.on("error", reject);
     proc.on("close", (code) => {
