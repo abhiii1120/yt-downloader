@@ -12,10 +12,10 @@ const app = express();
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 const allowedOrigins = [
-  "http://localhost:5173", // local dev
-  "https://yt-downloader-nu-jade.vercel.app/", // production
+  "http://localhost:5173",
+  "https://yt-downloader-nu-jade.vercel.app",    // ← your exact URL
+  /\.vercel\.app$/,                               // covers preview URLs too
 ];
-
 app.use(
   cors({
     origin: (origin, callback) => {
