@@ -19,5 +19,9 @@ mv ffmpeg-master-latest-linux64-gpl/bin/ffmpeg ./bin/ffmpeg
 mv ffmpeg-master-latest-linux64-gpl/bin/ffprobe ./bin/ffprobe
 chmod +x ./bin/ffmpeg ./bin/ffprobe
 rm -rf ffmpeg.tar.xz ffmpeg-master-latest-linux64-gpl
-
+yt-dlp --update-to nightly 2>/dev/null || true
+mkdir -p /opt/render/project/src/backend/.yt-dlp
+yt-dlp --js-runtimes "node:$(which node)" --remote-components ejs:github \
+  --dump-json --no-playlist "https://www.youtube.com/watch?v=dQw4w9WgXcQ" \
+  > /dev/null 2>&1 || true
 echo "✅ Build complete"

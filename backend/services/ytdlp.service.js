@@ -71,7 +71,7 @@ export async function fetchVideoInfo(url) {
   const nodeExec  = process.execPath;
 
   const { stdout } = await execAsync(
-    `${YTDLP_BIN} --dump-json --no-playlist ${cookieArg} --js-runtimes "node:${nodeExec}" --remote-components ejs:github --extractor-args "youtube:player_client=web" "${url}"`,
+    `${YTDLP_BIN} --dump-json --no-playlist ${cookieArg} --js-runtimes "node:${nodeExec}" --remote-components ejs:github --extractor-args "youtube:player_client=ios" "${url}"`,
     {
       env: { ...process.env, PATH: ENRICHED_PATH },
     }
@@ -90,14 +90,15 @@ export async function fetchVideoInfo(url) {
 /**
  * Downloads a YouTube video to the system temp directory.
  */
-export async function downloadVideo(url, quality = "best") {
+export async function downloadVideo(url, quality = "best", existingInfo = null) {
   const isAudio        = quality === "audio only";
   const ext            = isAudio ? "m4a" : "mp4";
   const format         = getFormat(quality);
   const tmpDir         = os.tmpdir();
   const outputTemplate = path.join(tmpDir, `${FILE_PREFIX}%(id)s.%(ext)s`);
 
-  const info = await fetchVideoInfo(url);
+  // Use existing info if passed — avoids double yt-dlp call
+  const info = existingInfo ?? await fetchVideoInfo(url);
 
   // Remove leftover temp files
   fs.readdirSync(tmpDir)
@@ -115,9 +116,9 @@ export async function downloadVideo(url, quality = "best") {
     "--retries",              RETRIES,
     "--fragment-retries",     RETRIES,
     "--merge-output-format",  ext,
-    "--extractor-args",       "youtube:player_client=web",
-      "--js-runtimes",          `node:${process.execPath}`,
-        "--remote-components",    "ejs:github",               
+    "--extractor-args",       "youtube:player_client=ios",
+    "--js-runtimes",          `node:${process.execPath}`,
+    "--remote-components",    "ejs:github",
     ...(COOKIES_FILE ? ["--cookies", COOKIES_FILE] : []),
     ...(isAudio ? ["--extract-audio", "--audio-format", "m4a"] : []),
     url,

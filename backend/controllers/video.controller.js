@@ -52,7 +52,9 @@ export async function downloadVideoFile(req, res, next) {
   }
 
   try {
-    const { filePath, ext, title } = await downloadVideo(url, quality);
+    // Fetch info once and pass it to downloadVideo
+    const info                    = await fetchVideoInfo(url);
+    const { filePath, ext, title } = await downloadVideo(url, quality, info);
 
     const mimeType = getMimeType(ext);
     const filename = `${safeFilename(title)}.${ext}`;
@@ -63,7 +65,6 @@ export async function downloadVideoFile(req, res, next) {
     const stream = fs.createReadStream(filePath);
     stream.pipe(res);
 
-    // Clean up temp file once stream has fully sent
     stream.on("close", () => {
       fs.unlink(filePath, (err) => {
         if (err) console.warn("[cleanup] Failed to delete temp file:", filePath);
