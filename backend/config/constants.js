@@ -44,3 +44,7 @@ export const MIME_MAP = {
   mp3: "audio/mpeg",
   webm: "video/webm",
 };
+
+// ── RapidAPI ──────────────────────────────────────────────────────────────────
+export const RAPIDAPI_KEY  = process.env.RAPIDAPI_KEY  || "";
+export const RAPIDAPI_HOST = process.env.RAPIDAPI_HOST || "yt-api.p.rapidapi.com";

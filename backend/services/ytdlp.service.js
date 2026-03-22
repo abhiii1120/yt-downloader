@@ -1,163 +1,146 @@
 /**
- * services/ytdlp.service.js — yt-dlp integration layer
- *
- * All yt-dlp spawning, file management, and format logic lives here.
- * Nothing in this file knows about HTTP requests or responses.
+ * services/ytdlp.service.js — YouTube download service
+ * Uses YT-API (RapidAPI) instead of local yt-dlp.
  */
-import { exec, spawn } from "child_process";
-import { promisify } from "util";
-import path from "path";
-import fs from "fs";
-import os from "os";
-import {
-  YTDLP_BIN,
-  FORMAT_MAP,
-  MIME_MAP,
-  FILE_PREFIX,
-  CONCURRENT_FRAGMENTS,
-  RETRIES,
-  FFMPEG_PATH,
-} from "../config/constants.js";
+import fetch  from "node-fetch";
+import path   from "path";
+import fs     from "fs";
+import os     from "os";
+import { MIME_MAP, FILE_PREFIX, RAPIDAPI_KEY, RAPIDAPI_HOST } from "../config/constants.js";
 
-const execAsync = promisify(exec);
+// ── Utilities ─────────────────────────────────────────────────────────────────
 
-// ── Utility helpers ───────────────────────────────────────────────────────────
-
-/**
- * Returns the yt-dlp format string for a given quality label.
- * Falls back to "best" for unrecognised values.
- * @param {string} quality
- * @returns {string}
- */
-export function getFormat(quality) {
-  return FORMAT_MAP[quality] ?? FORMAT_MAP["best"];
-}
-
-/**
- * Returns the MIME type for a given file extension.
- * @param {string} ext
- * @returns {string}
- */
 export function getMimeType(ext) {
   return MIME_MAP[ext] ?? "application/octet-stream";
 }
 
-/**
- * Strips characters that are illegal in filenames.
- * @param {string} title
- * @returns {string}
- */
 export function safeFilename(title = "video") {
   return title.replace(/[/\\?%*:|"<>]/g, "-");
 }
 
-// ── Core service functions ────────────────────────────────────────────────────
+function parseYouTubeId(url) {
+  try {
+    const u = new URL(url);
+    if (u.hostname.includes("youtu.be")) return u.pathname.slice(1).split("?")[0];
+    return u.searchParams.get("v");
+  } catch { return null; }
+}
+
+// ── Quality → height map ──────────────────────────────────────────────────────
+
+const QUALITY_HEIGHT = {
+  "1080p": 1080,
+  "720p":  720,
+  "480p":  480,
+  "360p":  360,
+  "best":  720,   // default to 720p for "best"
+};
+
+// ── API call ──────────────────────────────────────────────────────────────────
+
+async function fetchFromAPI(videoId) {
+  const res = await fetch(
+    `https://${RAPIDAPI_HOST}/videos?part=all&id=${videoId}`,
+    {
+      method: "GET",
+      headers: {
+        "X-RapidAPI-Key":  RAPIDAPI_KEY,
+        "X-RapidAPI-Host": RAPIDAPI_HOST,
+      },
+    }
+  );
+  if (!res.ok) throw new Error(`API request failed: ${res.status}`);
+  return res.json();
+}
+
+// ── Core functions ────────────────────────────────────────────────────────────
 
 /**
- * Fetches video metadata from YouTube via yt-dlp --dump-json.
- *
- * @param {string} url - YouTube video URL
- * @returns {Promise<{ title, uploader, duration, view_count, thumbnail, id }>}
+ * Fetches video metadata.
  */
 export async function fetchVideoInfo(url) {
-  const { stdout } = await execAsync(
-    `${YTDLP_BIN} --dump-json --no-playlist "${url}"`,
-  );
-  const raw = JSON.parse(stdout);
+  const videoId = parseYouTubeId(url);
+  if (!videoId) throw new Error("Invalid YouTube URL");
+
+  const data = await fetchFromAPI(videoId);
+
+  // Pick best thumbnail
+  const thumbnails = data.thumbnail || [];
+  const thumb = thumbnails[thumbnails.length - 1]?.url
+    ?? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+
   return {
-    title: raw.title,
-    uploader: raw.uploader,
-    duration: raw.duration,
-    view_count: raw.view_count,
-    thumbnail: raw.thumbnail,
-    id: raw.id,
+    title:      data.title,
+    uploader:   data.channelTitle,
+    duration:   parseInt(data.lengthSeconds, 10),
+    view_count: parseInt(data.viewCount, 10),
+    thumbnail:  thumb,
+    id:         videoId,
   };
 }
 
 /**
- * Downloads a YouTube video to the system temp directory.
- *
- * @param {string} url     - YouTube video URL
- * @param {string} quality - Quality label (e.g. "720p", "audio only")
- * @returns {Promise<{ filePath: string, ext: string, title: string, id: string }>}
+ * Downloads video by streaming the direct URL to a temp file.
  */
 export async function downloadVideo(url, quality = "best") {
+  const videoId = parseYouTubeId(url);
+  if (!videoId) throw new Error("Invalid YouTube URL");
+
   const isAudio = quality === "audio only";
-  const ext = isAudio ? "m4a" : "mp4";
-  const format = getFormat(quality);
-  const tmpDir = os.tmpdir();
-  const outputTemplate = path.join(tmpDir, `${FILE_PREFIX}%(id)s.%(ext)s`);
+  const data    = await fetchFromAPI(videoId);
 
-  // Get video ID so we can clean up and locate the output file
-  const info = await fetchVideoInfo(url);
+  let downloadUrl = null;
+  let ext         = "mp4";
 
-  // Remove any leftover temp files from a previous run
-  fs.readdirSync(tmpDir)
-    .filter((f) => f.startsWith(`${FILE_PREFIX}${info.id}`))
-    .forEach((f) => fs.unlinkSync(path.join(tmpDir, f)));
+  if (isAudio) {
+    // Pick best audio-only format — itag 140 is m4a medium quality
+    const audioFormats = (data.adaptiveFormats || [])
+      .filter((f) => f.mimeType?.startsWith("audio/mp4"))
+      .sort((a, b) => (b.bitrate ?? 0) - (a.bitrate ?? 0));
 
-  // Build yt-dlp arguments
-  const args = [
-    "--no-playlist",
-    "-f",
-    format,
-    "-o",
-    outputTemplate,
-    "--ffmpeg-location",
-    FFMPEG_PATH,
-    "--concurrent-fragments",
-    CONCURRENT_FRAGMENTS,
-    "--no-part",
-    "--no-mtime",
-    "--retries",
-    RETRIES,
-    "--fragment-retries",
-    RETRIES,
-    "--merge-output-format",
-    ext,
-    ...(isAudio ? ["--extract-audio", "--audio-format", "m4a"] : []),
-    url,
-  ];
+    const best = audioFormats[0];
+    if (!best) throw new Error("No audio format found");
+    downloadUrl = best.url;
+    ext         = "m4a";
 
-  await runProcess(YTDLP_BIN, args);
+  } else {
+    const targetHeight = QUALITY_HEIGHT[quality] ?? 720;
 
-  // Locate the output file (yt-dlp may vary the extension slightly)
-  const downloaded = fs
-    .readdirSync(tmpDir)
-    .find((f) => f.startsWith(`${FILE_PREFIX}${info.id}`));
+    // First try: combined video+audio from formats[] (itag 18 = 360p, 22 = 720p)
+    const combined = (data.formats || [])
+      .filter((f) => f.mimeType?.startsWith("video/mp4") && f.height)
+      .sort((a, b) => Math.abs(a.height - targetHeight) - Math.abs(b.height - targetHeight));
 
-  if (!downloaded) {
-    throw new Error("Downloaded file not found in temp directory.");
+    if (combined.length > 0) {
+      downloadUrl = combined[0].url;
+      ext         = "mp4";
+    } else {
+      // Fallback: best adaptive video format closest to target height
+      const adaptive = (data.adaptiveFormats || [])
+        .filter((f) => f.mimeType?.startsWith("video/mp4") && f.height)
+        .sort((a, b) => Math.abs(a.height - targetHeight) - Math.abs(b.height - targetHeight));
+
+      if (!adaptive[0]) throw new Error("No video format found");
+      downloadUrl = adaptive[0].url;
+      ext         = "mp4";
+    }
   }
 
-  const filePath = path.join(tmpDir, downloaded);
-  const actualExt = path.extname(downloaded).slice(1);
+  if (!downloadUrl) throw new Error("Could not find a download URL");
 
-  return { filePath, ext: actualExt, title: info.title, id: info.id };
-}
+  // Stream file to temp directory
+  const tmpDir   = os.tmpdir();
+  const filePath = path.join(tmpDir, `${FILE_PREFIX}${videoId}_${Date.now()}.${ext}`);
 
-// ── Private helpers ───────────────────────────────────────────────────────────
+  const fileRes = await fetch(downloadUrl);
+  if (!fileRes.ok) throw new Error("Failed to fetch video file from YouTube");
 
-/**
- * Runs a child process and returns a Promise that resolves on exit code 0.
- * stderr is forwarded to the parent process for visibility.
- *
- * @param {string}   bin  - Executable name
- * @param {string[]} args - Argument list
- * @returns {Promise<void>}
- */
-function runProcess(bin, args) {
-  return new Promise((resolve, reject) => {
-    const proc = spawn(bin, args);
-
-    proc.stderr.on("data", (chunk) => {
-      process.stderr.write(`[yt-dlp] ${chunk}`);
-    });
-
-    proc.on("error", reject);
-    proc.on("close", (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`${bin} exited with code ${code}`));
-    });
+  await new Promise((resolve, reject) => {
+    const dest = fs.createWriteStream(filePath);
+    fileRes.body.pipe(dest);
+    dest.on("finish", resolve);
+    dest.on("error",  reject);
   });
+
+  return { filePath, ext, title: data.title || "video", id: videoId };
 }
