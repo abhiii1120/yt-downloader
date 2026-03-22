@@ -1,0 +1,117 @@
+.progress-loader {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  background: rgba(230,57,80,0.04);
+  border: 1px solid rgba(230,57,80,0.12);
+  border-radius: var(--radius-md);
+  animation: fadeUp 0.3s ease;
+}
+
+/* Header row */
+.pl-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pl-stage-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.pl-pulse {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--red);
+  flex-shrink: 0;
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+
+.pl-pct {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 20px;
+  letter-spacing: 1px;
+  background: linear-gradient(135deg, var(--red), var(--orange));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+
+/* Track */
+.pl-track {
+  width: 100%;
+  height: 3px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.pl-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--red), var(--orange));
+  border-radius: 99px;
+  transition: width 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 10px var(--red-glow);
+}
+
+/* Steps */
+.pl-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pl-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  opacity: 0.25;
+  transition: opacity 0.4s ease;
+}
+
+.pl-step.done   { opacity: 0.45; }
+.pl-step.active { opacity: 1; }
+
+.pl-step-icon {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; flex-shrink: 0;
+  color: var(--text-muted);
+  transition: all 0.3s;
+}
+
+.pl-step.active .pl-step-icon {
+  border-color: var(--red);
+  background: var(--red-dim);
+}
+
+.pl-step.done .pl-step-icon {
+  border-color: rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.03);
+}
+
+.check { color: #4eca7a; font-size: 11px; }
+.dot   { width: 4px; height: 4px; border-radius: 50%; background: var(--text-dim); }
+
+.pl-step-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.pl-step.active .pl-step-label { color: var(--text); font-weight: 500; }
+.pl-step.done   .pl-step-label { color: var(--text-muted); }
+
+/* Hint */
+.pl-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+  text-align: center;
+  letter-spacing: 0.3px;
+}

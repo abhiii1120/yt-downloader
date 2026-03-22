@@ -1,0 +1,260 @@
+@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap");
+
+/* ── Variables ─────────────────────────────────────────────────────────────── */
+:root {
+  --bg:          #070710;
+  --surface:     #0e0e1a;
+  --surface-2:   #14142200;
+  --border:      rgba(255,255,255,0.07);
+  --border-hover:rgba(255,255,255,0.14);
+  --red:         #e63950;
+  --red-dim:     rgba(230,57,80,0.15);
+  --red-glow:    rgba(230,57,80,0.35);
+  --orange:      #f7794b;
+  --text:        #f2f2f8;
+  --text-muted:  #6a6a88;
+  --text-dim:    #3a3a55;
+  --radius-sm:   8px;
+  --radius-md:   14px;
+  --radius-lg:   22px;
+  --transition:  0.2s cubic-bezier(0.4,0,0.2,1);
+}
+
+/* ── Reset ──────────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Outfit", sans-serif;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Background ─────────────────────────────────────────────────────────────── */
+.app {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 20px 60px;
+  overflow: hidden;
+}
+
+.bg-grid {
+  position: fixed; inset: 0; z-index: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
+}
+
+.bg-orb {
+  position: fixed; border-radius: 50%;
+  filter: blur(100px); pointer-events: none; z-index: 0;
+}
+.orb-1 { width: 700px; height: 700px; background: var(--red);    opacity: 0.07; top: -200px; right: -150px; }
+.orb-2 { width: 500px; height: 500px; background: var(--orange);  opacity: 0.06; bottom: -100px; left: -120px; }
+.orb-3 { width: 300px; height: 300px; background: #4b6cf7;        opacity: 0.05; top: 40%; left: 50%; transform: translateX(-50%); }
+
+.bg-noise {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────────── */
+.site-header {
+  position: relative; z-index: 10;
+  width: 100%; max-width: 660px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 28px 0 0;
+}
+
+.logo { display: flex; align-items: center; gap: 12px; }
+
+.logo-mark {
+  width: 40px; height: 40px; border-radius: 10px;
+  background: linear-gradient(135deg, var(--red), var(--orange));
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 20px var(--red-glow);
+}
+
+.logo-arrow { font-size: 20px; color: #fff; font-weight: 900; }
+
+.logo-text-wrap { display: flex; flex-direction: column; line-height: 1; }
+
+.logo-name {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 22px; letter-spacing: 3px;
+  background: linear-gradient(135deg, #fff 0%, #aaa 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+
+.logo-sub { font-size: 10px; color: var(--text-muted); letter-spacing: 1.5px; text-transform: uppercase; margin-top: 2px; }
+
+.header-badge {
+  font-size: 11px; font-weight: 600; letter-spacing: 1px;
+  padding: 4px 10px; border-radius: 99px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+/* ── Hero ───────────────────────────────────────────────────────────────────── */
+.hero {
+  position: relative; z-index: 10;
+  text-align: center;
+  padding: 52px 0 40px;
+}
+
+.hero-title {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: clamp(52px, 10vw, 88px);
+  line-height: 1;
+  letter-spacing: 3px;
+  color: #fff;
+  margin-bottom: 16px;
+}
+
+.hero-accent {
+  background: linear-gradient(135deg, var(--red) 0%, var(--orange) 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+
+.hero-desc {
+  font-size: 15px; color: var(--text-muted);
+  letter-spacing: 0.5px; font-weight: 300;
+}
+
+/* ── Main card ──────────────────────────────────────────────────────────────── */
+.main-card {
+  position: relative; z-index: 10;
+  width: 100%; max-width: 660px;
+  background: rgba(14,14,26,0.7);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  backdrop-filter: blur(24px);
+  box-shadow: 0 32px 100px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03) inset;
+  display: flex; flex-direction: column; gap: 28px;
+}
+
+/* ── Step blocks ────────────────────────────────────────────────────────────── */
+.step-block {
+  display: flex; flex-direction: column; gap: 14px;
+}
+
+.step-label-row {
+  display: flex; align-items: center; gap: 10px;
+}
+
+.step-num {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 13px; letter-spacing: 2px;
+  color: var(--red); opacity: 0.8;
+}
+
+.step-title {
+  font-size: 13px; font-weight: 600;
+  color: var(--text-muted); letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.step-block + .step-block {
+  padding-top: 28px;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Animations ─────────────────────────────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.7); }
+}
+@keyframes shimmer {
+  from { background-position: -200% center; }
+  to   { background-position: 200% center; }
+}
+
+.animate-in { animation: fadeUp 0.35s ease both; }
+
+/* ── Shared button base ─────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border: none; border-radius: var(--radius-sm);
+  font-family: "Outfit", sans-serif; font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: all var(--transition);
+  letter-spacing: 0.3px; white-space: nowrap;
+}
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--red) 0%, var(--orange) 100%);
+  color: #fff; padding: 13px 22px;
+  box-shadow: 0 4px 20px var(--red-glow);
+}
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.1); transform: translateY(-1px);
+  box-shadow: 0 8px 30px var(--red-glow);
+}
+
+.btn-ghost {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  color: var(--text-muted); padding: 13px 18px;
+}
+.btn-ghost:hover:not(:disabled) {
+  background: rgba(255,255,255,0.08);
+  border-color: var(--border-hover); color: var(--text);
+}
+
+/* ── Spinner ────────────────────────────────────────────────────────────────── */
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid rgba(255,255,255,0.2);
+  border-top-color: #fff; border-radius: 50%;
+  animation: spin 0.65s linear infinite; display: inline-block;
+}
+
+.mini-spin {
+  width: 10px; height: 10px;
+  border: 1.5px solid var(--red-dim);
+  border-top-color: var(--red); border-radius: 50%;
+  animation: spin 0.65s linear infinite; display: inline-block;
+}
+
+/* ── Done box ───────────────────────────────────────────────────────────────── */
+.done-box {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 20px;
+  background: rgba(46, 200, 102, 0.08);
+  border: 1px solid rgba(46,200,102,0.2);
+  border-radius: var(--radius-md);
+  font-size: 14px; color: #4eca7a; font-weight: 500;
+  animation: fadeUp 0.3s ease;
+}
+
+.done-icon {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: rgba(46,200,102,0.15); border: 1px solid rgba(46,200,102,0.3);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; flex-shrink: 0;
+}
+
+/* ── Footer ─────────────────────────────────────────────────────────────────── */
+.site-footer {
+  position: relative; z-index: 10;
+  text-align: center; margin-top: 32px;
+  display: flex; flex-direction: column; gap: 4px;
+  font-size: 12px; color: var(--text-dim);
+}
+
+.footer-tech { font-size: 11px; letter-spacing: 0.5px; }
