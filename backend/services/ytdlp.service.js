@@ -71,7 +71,7 @@ export async function fetchVideoInfo(url) {
   const nodeExec  = process.execPath;
 
   const { stdout } = await execAsync(
-    `${YTDLP_BIN} --dump-json --no-playlist ${cookieArg} --js-runtimes "node:${nodeExec}" --extractor-args "youtube:player_client=web" "${url}"`,
+    `${YTDLP_BIN} --dump-json --no-playlist ${cookieArg} --js-runtimes "node:${nodeExec}" --remote-components ejs:github --extractor-args "youtube:player_client=web" "${url}"`,
     {
       env: { ...process.env, PATH: ENRICHED_PATH },
     }
@@ -116,7 +116,8 @@ export async function downloadVideo(url, quality = "best") {
     "--fragment-retries",     RETRIES,
     "--merge-output-format",  ext,
     "--extractor-args",       "youtube:player_client=web",
-      "--js-runtimes",          `node:${process.execPath}`, 
+      "--js-runtimes",          `node:${process.execPath}`,
+        "--remote-components",    "ejs:github",               
     ...(COOKIES_FILE ? ["--cookies", COOKIES_FILE] : []),
     ...(isAudio ? ["--extract-audio", "--audio-format", "m4a"] : []),
     url,
