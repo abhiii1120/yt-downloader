@@ -67,26 +67,55 @@ export function safeFilename(title = "video") {
  * Fetches video metadata from YouTube via yt-dlp --dump-json.
  */
 export async function fetchVideoInfo(url) {
-  const cookieArg = COOKIES_FILE ? `--cookies "${COOKIES_FILE}"` : "";
-  const nodeExec  = process.execPath;
+  const args = [
+    "--dump-json",
+    "--no-playlist",
+    "--extractor-args", "youtube:player_client=web,mweb",
+    "--js-runtimes",    `node:${process.execPath}`,
+    "--remote-components", "ejs:github",
+  ];
 
-  const { stdout } = await execAsync(
-    `${YTDLP_BIN} --dump-json --no-playlist ${cookieArg} --js-runtimes "node:${nodeExec}" --remote-components ejs:github "--extractor-args", "youtube:player_client=web,mweb",
-" "${url}"`,
-    {
+  if (COOKIES_FILE) {
+    args.push("--cookies", COOKIES_FILE);
+  }
+
+  args.push(url);
+
+  return new Promise((resolve, reject) => {
+    let stdout = "";
+    let stderr = "";
+
+    const proc = spawn(YTDLP_BIN, args, {
       env: { ...process.env, PATH: ENRICHED_PATH },
-    }
-  );
+    });
 
-  const raw = JSON.parse(stdout);
-  return {
-    title:      raw.title,
-    uploader:   raw.uploader,
-    duration:   raw.duration,
-    view_count: raw.view_count,
-    thumbnail:  raw.thumbnail,
-    id:         raw.id,
-  };
+    proc.stdout.on("data", (chunk) => { stdout += chunk; });
+    proc.stderr.on("data", (chunk) => {
+      stderr += chunk;
+      process.stderr.write(`[yt-dlp] ${chunk}`);
+    });
+
+    proc.on("error", reject);
+    proc.on("close", (code) => {
+      if (code === 0) {
+        try {
+          const raw = JSON.parse(stdout);
+          resolve({
+            title:      raw.title,
+            uploader:   raw.uploader,
+            duration:   raw.duration,
+            view_count: raw.view_count,
+            thumbnail:  raw.thumbnail,
+            id:         raw.id,
+          });
+        } catch (e) {
+          reject(new Error("Failed to parse yt-dlp output"));
+        }
+      } else {
+        reject(new Error(`yt-dlp exited with code ${code}: ${stderr}`));
+      }
+    });
+  });
 }
 /**
  * Downloads a YouTube video to the system temp directory.
@@ -106,24 +135,24 @@ export async function downloadVideo(url, quality = "best", existingInfo = null) 
     .filter((f) => f.startsWith(`${FILE_PREFIX}${info.id}`))
     .forEach((f) => fs.unlinkSync(path.join(tmpDir, f)));
 
-  const args = [
-    "--no-playlist",
-    "-f",    format,
-    "-o",    outputTemplate,
-    "--ffmpeg-location",      FFMPEG_PATH,
-    "--concurrent-fragments", CONCURRENT_FRAGMENTS,
-    "--no-part",
-    "--no-mtime",
-    "--retries",              RETRIES,
-    "--fragment-retries",     RETRIES,
-    "--merge-output-format",  ext,
-    "--extractor-args",       "youtube:player_client=web,mweb",
-    "--js-runtimes",          `node:${process.execPath}`,
-    "--remote-components",    "ejs:github",
-    ...(COOKIES_FILE ? ["--cookies", COOKIES_FILE] : []),
-    ...(isAudio ? ["--extract-audio", "--audio-format", "m4a"] : []),
-    url,
-  ];
+ const args = [
+  "--no-playlist",
+  "-f",    format,
+  "-o",    outputTemplate,
+  "--ffmpeg-location",      FFMPEG_PATH,
+  "--concurrent-fragments", CONCURRENT_FRAGMENTS,
+  "--no-part",
+  "--no-mtime",
+  "--retries",              RETRIES,
+  "--fragment-retries",     RETRIES,
+  "--merge-output-format",  ext,
+  "--extractor-args",       "youtube:player_client=web,mweb",
+  "--js-runtimes",          `node:${process.execPath}`,
+  "--remote-components",    "ejs:github",
+  ...(COOKIES_FILE ? ["--cookies", COOKIES_FILE] : []),
+  ...(isAudio ? ["--extract-audio", "--audio-format", "m4a"] : []),
+  url,
+];
 
   await runProcess(YTDLP_BIN, args);
 
