@@ -58,7 +58,13 @@ export function getMimeType(ext) {
 }
 
 export function safeFilename(title = "video") {
-  return title.replace(/[/\\?%*:|"<>]/g, "-");
+  return title
+    .replace(/[/\\?%*:|"<>]/g, "-")  // remove illegal chars
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, "")  // remove control chars
+    .replace(/[^\x00-\x7F]/g, "")    // remove non-ASCII (emojis, etc)
+    .replace(/\s+/g, "_")            // spaces to underscores
+    .trim()
+    .substring(0, 100);              // limit length
 }
 
 // ── Core service functions ────────────────────────────────────────────────────
@@ -70,7 +76,7 @@ export async function fetchVideoInfo(url) {
   const args = [
     "--dump-json",
     "--no-playlist",
-    "--extractor-args", "youtube:player_client=web,mweb",
+    "--extractor-args", "youtube:player_client=web",
     "--js-runtimes",    `node:${process.execPath}`,
     "--remote-components", "ejs:github",
   ];
@@ -146,7 +152,7 @@ export async function downloadVideo(url, quality = "best", existingInfo = null) 
   "--retries",              RETRIES,
   "--fragment-retries",     RETRIES,
   "--merge-output-format",  ext,
-  "--extractor-args",       "youtube:player_client=web,mweb",
+  "--extractor-args",       "youtube:player_client=web",
   "--js-runtimes",          `node:${process.execPath}`,
   "--remote-components",    "ejs:github",
   ...(COOKIES_FILE ? ["--cookies", COOKIES_FILE] : []),
