@@ -68,15 +68,12 @@ export function safeFilename(title = "video") {
  */
 export async function fetchVideoInfo(url) {
   const cookieArg = COOKIES_FILE ? `--cookies "${COOKIES_FILE}"` : "";
-  const nodeExec  = process.execPath; // full path to node binary
+  const nodeExec  = process.execPath;
 
   const { stdout } = await execAsync(
-    `${YTDLP_BIN} --dump-json --no-playlist ${cookieArg} --js-runtimes "nodejs:${nodeExec}" --extractor-args "youtube:player_client=web" "${url}"`,
+    `${YTDLP_BIN} --dump-json --no-playlist ${cookieArg} --js-runtimes "node:${nodeExec}" --extractor-args "youtube:player_client=web" "${url}"`,
     {
-      env: {
-        ...process.env,
-        PATH: ENRICHED_PATH,
-      },
+      env: { ...process.env, PATH: ENRICHED_PATH },
     }
   );
 
@@ -119,7 +116,7 @@ export async function downloadVideo(url, quality = "best") {
     "--fragment-retries",     RETRIES,
     "--merge-output-format",  ext,
     "--extractor-args",       "youtube:player_client=web",
-      "--js-runtimes",          `nodejs:${process.execPath}`, 
+      "--js-runtimes",          `node:${process.execPath}`, 
     ...(COOKIES_FILE ? ["--cookies", COOKIES_FILE] : []),
     ...(isAudio ? ["--extract-audio", "--audio-format", "m4a"] : []),
     url,
