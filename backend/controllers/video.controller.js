@@ -34,7 +34,7 @@ export async function getVideoInfo(req, res, next) {
     const info = await fetchVideoInfo(url);
     res.json(info);
   } catch (err) {
-    console.error("[getVideoInfo]", err.message);
+    console.error("[getVideoInfo] Full error:", err.message);  // ← see real error
     next(new Error("Could not fetch video info. Please check the URL."));
   }
 }
