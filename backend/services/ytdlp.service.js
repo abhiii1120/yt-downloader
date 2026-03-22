@@ -1,167 +1,150 @@
 /**
- * services/ytdlp.service.js — YouTube download service
- * Uses YT-API (RapidAPI) instead of local yt-dlp.
+ * services/ytdlp.service.js — yt-dlp integration layer
+ *
+ * Cookies are loaded from:
+ *   - Local dev  → backend/cookies.txt file
+ *   - Production → YOUTUBE_COOKIES environment variable
  */
-import path from "path";
-import fs from "fs";
-import os from "os";
+import { exec, spawn } from "child_process";
+import { promisify }   from "util";
+import path            from "path";
+import fs              from "fs";
+import os              from "os";
+
 import {
+  YTDLP_BIN,
+  FORMAT_MAP,
   MIME_MAP,
   FILE_PREFIX,
-  RAPIDAPI_KEY,
-  RAPIDAPI_HOST,
+  FFMPEG_PATH,
+  CONCURRENT_FRAGMENTS,
+  RETRIES,
 } from "../config/constants.js";
 
-// ── Utilities ─────────────────────────────────────────────────────────────────
+const execAsync = promisify(exec);
 
+// ── Load cookies ──────────────────────────────────────────────────────────────
+let COOKIES_FILE = null;
+
+if (process.env.NODE_ENV === "production" && process.env.YOUTUBE_COOKIES) {
+  // Production (Render) — write env variable content to a temp file
+  COOKIES_FILE = path.join(os.tmpdir(), "yt_cookies.txt");
+  fs.writeFileSync(COOKIES_FILE, process.env.YOUTUBE_COOKIES, "utf-8");
+  console.log("✅ YouTube cookies loaded from environment variable");
+} else {
+  // Local development — use cookies.txt file directly
+  const localCookies = path.join(process.cwd(), "cookies.txt");
+  if (fs.existsSync(localCookies)) {
+    COOKIES_FILE = localCookies;
+    console.log("✅ YouTube cookies loaded from cookies.txt");
+  } else {
+    console.warn("⚠️  No cookies found — may get bot detection errors");
+  }
+}
+
+// ── Utility helpers ───────────────────────────────────────────────────────────
+
+/**
+ * Returns the yt-dlp format string for a given quality label.
+ * Falls back to "best" for unrecognised values.
+ */
+export function getFormat(quality) {
+  return FORMAT_MAP[quality] ?? FORMAT_MAP["best"];
+}
+
+/**
+ * Returns the MIME type for a given file extension.
+ */
 export function getMimeType(ext) {
   return MIME_MAP[ext] ?? "application/octet-stream";
 }
 
+/**
+ * Strips characters that are illegal in filenames.
+ */
 export function safeFilename(title = "video") {
   return title.replace(/[/\\?%*:|"<>]/g, "-");
 }
 
-function parseYouTubeId(url) {
-  try {
-    const u = new URL(url);
-    if (u.hostname.includes("youtu.be"))
-      return u.pathname.slice(1).split("?")[0];
-    return u.searchParams.get("v");
-  } catch {
-    return null;
-  }
-}
-
-// ── Quality → height map ──────────────────────────────────────────────────────
-
-const QUALITY_HEIGHT = {
-  "1080p": 1080,
-  "720p": 720,
-  "480p": 480,
-  "360p": 360,
-  best: 720, // default to 720p for "best"
-};
-
-// ── API call ──────────────────────────────────────────────────────────────────
-async function fetchFromAPI(videoId) {
-  const url = `https://${RAPIDAPI_HOST}/dl?id=${videoId}`;
-
-  console.log("[API] Calling:", url);
-
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      "x-rapidapi-host": RAPIDAPI_HOST,
-      "x-rapidapi-key": RAPIDAPI_KEY,
-    },
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    console.error("[API Error]", res.status, errText);
-    throw new Error(`API request failed: ${res.status}`);
-  }
-
-  const data = await res.json();
-  console.log("[API Response Keys]", Object.keys(data));
-  console.log("[formats count]", data.formats?.length ?? 0);
-  console.log("[adaptiveFormats count]", data.adaptiveFormats?.length ?? 0);
-  return data;
-}
-// ── Core functions ────────────────────────────────────────────────────────────
+// ── Core service functions ────────────────────────────────────────────────────
 
 /**
- * Fetches video metadata.
+ * Fetches video metadata from YouTube via yt-dlp --dump-json.
  */
 export async function fetchVideoInfo(url) {
-  const videoId = parseYouTubeId(url);
-  if (!videoId) throw new Error("Invalid YouTube URL");
+  const cookieArg = COOKIES_FILE ? `--cookies "${COOKIES_FILE}"` : "";
 
-  const data = await fetchFromAPI(videoId);
+  const { stdout } = await execAsync(
+    `${YTDLP_BIN} --dump-json --no-playlist ${cookieArg} "${url}"`
+  );
 
+  const raw = JSON.parse(stdout);
   return {
-    title: data.title,
-    uploader: data.channelTitle,
-    duration: parseInt(data.lengthSeconds, 10),
-    view_count: parseInt(data.viewCount, 10),
-    thumbnail:
-      data.thumbnail?.[data.thumbnail.length - 1]?.url ??
-      `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
-    id: videoId,
+    title:      raw.title,
+    uploader:   raw.uploader,
+    duration:   raw.duration,
+    view_count: raw.view_count,
+    thumbnail:  raw.thumbnail,
+    id:         raw.id,
   };
 }
+
 /**
- * Downloads video by streaming the direct URL to a temp file.
+ * Downloads a YouTube video to the system temp directory.
  */
 export async function downloadVideo(url, quality = "best") {
-  const videoId = parseYouTubeId(url);
-  if (!videoId) throw new Error("Invalid YouTube URL");
+  const isAudio        = quality === "audio only";
+  const ext            = isAudio ? "m4a" : "mp4";
+  const format         = getFormat(quality);
+  const tmpDir         = os.tmpdir();
+  const outputTemplate = path.join(tmpDir, `${FILE_PREFIX}%(id)s.%(ext)s`);
 
-  const isAudio = quality === "audio only";
-  const data    = await fetchFromAPI(videoId);
+  const info = await fetchVideoInfo(url);
 
-  const allFormats         = data.formats        ?? [];
-  const allAdaptiveFormats = data.adaptiveFormats ?? [];
+  // Remove leftover temp files
+  fs.readdirSync(tmpDir)
+    .filter((f) => f.startsWith(`${FILE_PREFIX}${info.id}`))
+    .forEach((f) => fs.unlinkSync(path.join(tmpDir, f)));
 
-  let downloadUrl = null;
-  let ext         = "mp4";
+  const args = [
+    "--no-playlist",
+    "-f",    format,
+    "-o",    outputTemplate,
+    "--ffmpeg-location",      FFMPEG_PATH,
+    "--concurrent-fragments", CONCURRENT_FRAGMENTS,
+    "--no-part",
+    "--no-mtime",
+    "--retries",              RETRIES,
+    "--fragment-retries",     RETRIES,
+    "--merge-output-format",  ext,
+    ...(COOKIES_FILE ? ["--cookies", COOKIES_FILE] : []),
+    ...(isAudio ? ["--extract-audio", "--audio-format", "m4a"] : []),
+    url,
+  ];
 
-  if (isAudio) {
-    const audioFormats = allAdaptiveFormats
-      .filter((f) => f.mimeType?.includes("audio/mp4"))
-      .sort((a, b) => (b.bitrate ?? 0) - (a.bitrate ?? 0));
+  await runProcess(YTDLP_BIN, args);
 
-    if (!audioFormats[0]) throw new Error("No audio format found");
-    downloadUrl = audioFormats[0].url;
-    ext         = "m4a";
+  const downloaded = fs.readdirSync(tmpDir)
+    .find((f) => f.startsWith(`${FILE_PREFIX}${info.id}`));
 
-  } else {
-    const targetHeight = QUALITY_HEIGHT[quality] ?? 720;
+  if (!downloaded) throw new Error("Downloaded file not found in temp directory.");
 
-    // Try combined formats first (video + audio in one file)
-    const combinedMp4 = allFormats
-      .filter((f) => f.mimeType?.includes("video/mp4") && f.url)
-      .sort((a, b) =>
-        Math.abs((a.height ?? 0) - targetHeight) -
-        Math.abs((b.height ?? 0) - targetHeight)
-      );
+  const filePath  = path.join(tmpDir, downloaded);
+  const actualExt = path.extname(downloaded).slice(1);
 
-    if (combinedMp4[0]) {
-      downloadUrl = combinedMp4[0].url;
-      ext         = "mp4";
-    } else {
-      // Fallback to adaptive video
-      const adaptiveVideo = allAdaptiveFormats
-        .filter((f) => f.mimeType?.includes("video/mp4") && f.url && f.height)
-        .sort((a, b) =>
-          Math.abs((a.height ?? 0) - targetHeight) -
-          Math.abs((b.height ?? 0) - targetHeight)
-        );
+  return { filePath, ext: actualExt, title: info.title, id: info.id };
+}
 
-      if (!adaptiveVideo[0]) throw new Error("No video format found");
-      downloadUrl = adaptiveVideo[0].url;
-      ext         = "mp4";
-    }
-  }
+// ── Private helpers ───────────────────────────────────────────────────────────
 
-  if (!downloadUrl) throw new Error("Could not find download URL");
-
-  console.log("[Downloading]", ext, downloadUrl.slice(0, 60) + "...");
-
-  // Download to temp file
-  const tmpDir   = os.tmpdir();
-  const filePath = path.join(tmpDir, `${FILE_PREFIX}${videoId}_${Date.now()}.${ext}`);
-
-  const fileRes = await fetch(downloadUrl);
-  if (!fileRes.ok) throw new Error(`Failed to fetch video: ${fileRes.status}`);
-
-  // Convert Web Stream to Buffer (Node 18+ built-in fetch)
-  const arrayBuffer = await fileRes.arrayBuffer();
-  fs.writeFileSync(filePath, Buffer.from(arrayBuffer));
-
-  console.log("[Downloaded]", filePath);
-
-  return { filePath, ext, title: data.title || "video", id: videoId };
+function runProcess(bin, args) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(bin, args);
+    proc.stderr.on("data", (chunk) => process.stderr.write(`[yt-dlp] ${chunk}`));
+    proc.on("error", reject);
+    proc.on("close", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`${bin} exited with code ${code}`));
+    });
+  });
 }

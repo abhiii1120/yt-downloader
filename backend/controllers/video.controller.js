@@ -5,8 +5,6 @@
  *   - validate input
  *   - call the service layer
  *   - send the response (or forward error to errorHandler)
- *
- * No yt-dlp logic lives here.
  */
 import fs from "fs";
 import {
@@ -34,7 +32,7 @@ export async function getVideoInfo(req, res, next) {
     const info = await fetchVideoInfo(url);
     res.json(info);
   } catch (err) {
-    console.error("[getVideoInfo] Full error:", err.message);  // ← see real error
+    console.error("[getVideoInfo]", err.message);
     next(new Error("Could not fetch video info. Please check the URL."));
   }
 }
@@ -68,8 +66,7 @@ export async function downloadVideoFile(req, res, next) {
     // Clean up temp file once stream has fully sent
     stream.on("close", () => {
       fs.unlink(filePath, (err) => {
-        if (err)
-          console.warn("[cleanup] Failed to delete temp file:", filePath);
+        if (err) console.warn("[cleanup] Failed to delete temp file:", filePath);
       });
     });
   } catch (err) {
