@@ -9,7 +9,6 @@ import { promisify } from "util";
 import path from "path";
 import fs from "fs";
 import os from "os";
-
 import {
   YTDLP_BIN,
   FORMAT_MAP,
@@ -17,6 +16,7 @@ import {
   FILE_PREFIX,
   CONCURRENT_FRAGMENTS,
   RETRIES,
+  FFMPEG_PATH,
 } from "../config/constants.js";
 
 const execAsync = promisify(exec);
@@ -103,6 +103,8 @@ export async function downloadVideo(url, quality = "best") {
     format,
     "-o",
     outputTemplate,
+    "--ffmpeg-location",
+    FFMPEG_PATH,
     "--concurrent-fragments",
     CONCURRENT_FRAGMENTS,
     "--no-part",

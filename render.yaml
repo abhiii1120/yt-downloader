@@ -4,7 +4,7 @@ services:
     runtime: node
     rootDir: backend
     plan: free
-    buildCommand: npm install && pip install -U yt-dlp && apt-get install -y ffmpeg
+    buildCommand: chmod +x build.sh && ./build.sh
     startCommand: node server.js
     envVars:
       - key: NODE_ENV

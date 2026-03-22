@@ -3,14 +3,25 @@
  * All magic numbers, strings, and maps live here.
  * Change these values without touching business logic.
  */
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ── Server ────────────────────────────────────────────────────────────────────
 export const PORT = process.env.PORT || 4000;
+
 // ── yt-dlp ────────────────────────────────────────────────────────────────────
 export const YTDLP_BIN = "yt-dlp";
-export const CONCURRENT_FRAGMENTS = "5"; // parallel chunk downloads
+export const CONCURRENT_FRAGMENTS = "5";
 export const RETRIES = "3";
 export const FILE_PREFIX = "ytget_";
+
+// Use local ffmpeg binary in production, system ffmpeg in development
+export const FFMPEG_PATH =
+  process.env.NODE_ENV === "production"
+    ? path.join(__dirname, "../bin/ffmpeg")
+    : "ffmpeg";
 
 // ── Quality → yt-dlp format string map ───────────────────────────────────────
 export const FORMAT_MAP = {
