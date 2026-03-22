@@ -2,6 +2,8 @@ services:
   - type: web
     name: yt-downloader-backend
     runtime: node
+    rootDir: backend
+    plan: free
     buildCommand: npm install && pip install -U yt-dlp && apt-get install -y ffmpeg
     startCommand: node server.js
     envVars:
