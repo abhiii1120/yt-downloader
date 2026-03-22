@@ -5,7 +5,7 @@ import QualityPicker from "./components/qualityPicker/QualityPicker";
 import ProgressLoader from "./components/progressLoader/ProgressLoader";
 import DownloadBtn from "./components/downloadButton/DownloadBtn";
 import ErrorBox from "./components/errorBox/ErrorBox";
-import "./app.css";
+import "./App.css";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const API = import.meta.env.VITE_API_URL;
