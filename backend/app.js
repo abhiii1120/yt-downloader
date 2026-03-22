@@ -13,7 +13,7 @@ const app = express();
 // ── Middleware ────────────────────────────────────────────────────────────────
 const allowedOrigins = [
   "http://localhost:5173", // local dev
-  "https://your-frontend-on-vercel.app", // production
+  "https://yt-downloader-nu-jade.vercel.app/", // production
 ];
 
 app.use(
